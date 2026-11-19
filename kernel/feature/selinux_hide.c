@@ -541,9 +541,19 @@ init_hooks:; // apply_kernelsu_rules_fn
 	const char *init_adb_args[] = { "init", "adb_data_file", NULL };
 	ksu_add_shit_to_list(KSU_SEPOLICY_CMD_NORMAL_PERM, init_adb_args);
 
-	// we move this to a module instead
-	// const char *adbroot_args[] = { "adbroot", NULL };
-	// ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_args);
+	// Re-enabled: hide ROM-baked adb_root types from Dirty Sepolicy / detectors.
+	// (Originally moved to a module, re-enabled here directly in-kernel.)
+	const char *adbroot_args[] = { "adbroot", NULL };
+	ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_args);
+
+	const char *adbroot_exec_args[] = { "adbroot_exec", NULL };
+	ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_exec_args);
+
+	const char *adbroot_data_file_args[] = { "adbroot_data_file", NULL };
+	ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_data_file_args);
+
+	const char *adbroot_service_args[] = { "adbroot_service", NULL };
+	ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_service_args);
 
 	int tries = 0;
 try_again:
