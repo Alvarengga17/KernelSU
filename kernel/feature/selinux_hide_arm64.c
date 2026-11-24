@@ -98,13 +98,8 @@ static char *sh_simple_transaction_get(struct file *file, const char __user *buf
 
 	if (ino == SEL_CONTEXT && ksu_should_destroy_context(data, size, true)) {
 		pr_info_ratelimited("selinux_hide: simple_transaction_get: context: destroy: %s \n", data);
-		do_useless_alloc(size);
-		do_useless_alloc(size);
-		do_useless_alloc(size);
-		return ERR_PTR(-EINVAL);
-
-//		replace_after_second_colon(data, size);
-//		do_useless_alloc(size);
+		replace_after_second_colon(data, size);
+		return data;
 	}
 
 	if (ino == SEL_ACCESS && ksu_should_destroy_context(data, size, false)) {
@@ -275,11 +270,8 @@ static __always_inline int should_ret_einval(const char *scontext, u32 scontext_
 		return 0;
 
 	pr_info_ratelimited("selinux_hide: security_context_to_sid: destroy: %.*s\n", scontext_len, scontext);
-//	replace_after_second_colon(data, size);
-	do_useless_alloc(scontext_len);
-	do_useless_alloc(scontext_len);
-	do_useless_alloc(scontext_len);
-	return -EINVAL;
+	replace_after_second_colon((char *)scontext, scontext_len);
+	return 0;
 }
 
 
@@ -383,45 +375,10 @@ failure_xattr:
 
 static inline int patch_branch_context_to_sid_procattr(void)
 {
-	uintptr_t target_callsite = 0x0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
-	if (!target_callsite) 
-		target_callsite = kallsyms_lookup_retry("selinux_lsm_setattr", lookup_noscan);
-#endif
-	if (!target_callsite)
-		target_callsite = kallsyms_lookup_retry("selinux_setprocattr");
-	uintptr_t symbol_addr = kallsyms_lookup_retry("security_context_to_sid_core");
-	if (!symbol_addr || !target_callsite)
-		goto noncore_procattr;
-
-	if (!security_context_to_sid_core_fn)
-		security_context_to_sid_core_fn = (void *)symbol_addr;
-
-	int ret = patch_arm64_branches_trampolined(target_callsite, symbol_addr, (uintptr_t)&sh_security_context_to_sid_core);
-	pr_info("selinux_hide: hook_site: selinux_setprocattr->security_context_to_sid_core ret: %d \n", ret);
-	if (!ret)
-		goto success_procattr;
-noncore_procattr:;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
-	if (!target_callsite)
-		target_callsite = kallsyms_lookup_retry("selinux_lsm_setattr", lookup_noscan);
-#endif
-	if (!target_callsite)
-		target_callsite = kallsyms_lookup_retry("selinux_setprocattr");
-	symbol_addr = kallsyms_lookup_retry("security_context_to_sid");
-	if (!symbol_addr || !target_callsite)
-		goto failure_procattr;
-
-	ret = patch_arm64_branches_trampolined(target_callsite, symbol_addr, (uintptr_t)&sh_security_context_to_sid_overloaded);
-	pr_info("selinux_hide: hook_site: selinux_setprocattr->security_context_to_sid ret: %d \n", ret);
-	if (ret)
-		goto failure_procattr;
-success_procattr:
-	ksu_decide_setprocattr(true);
-	return ret;
-failure_procattr:
+	/* symmetric LSM hook: a security_context_to_sid hook here runs only on the
+	 * parseable path and leaks a setprocattr timing asymmetry */
 	ksu_decide_setprocattr(false);
-	return ret;
+	return 0;
 }
 
 static inline int patch_branch_context_to_sid(void)
